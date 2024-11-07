@@ -1,17 +1,26 @@
 {
-  "name": "js-pdk-template",
+  "name": "@taskless/~observe",
+  "private": true,
   "version": "1.0.0",
   "description": "",
   "main": "src/index.ts",
+  "type": "module",
   "scripts": {
-    "build": "tsc --noEmit && node esbuild.js && extism-js dist/index.js -i src/index.d.ts -o dist/plugin.wasm"
+    "build": "run-s 'build:tsc' 'build:esbuild' 'build:extism' 'build:pack'",
+    "build:tsc": "tsc --noEmit",
+    "build:esbuild": "node esbuild.js",
+    "build:extism": "extism-js dist/index.js -i src/index.d.ts -o dist/plugin.wasm",
+    "build:pack": "node packbuild.js"
   },
   "keywords": [],
   "author": "",
-  "license": "BSD-3-Clause",
+  "license": "",
   "devDependencies": {
     "@extism/js-pdk": "^1.0.1",
     "esbuild": "^0.19.6",
-    "typescript": "^5.3.2"
+    "npm-run-all2": "^7.0.1",
+    "typescript": "^5.3.2",
+    "uint8array-extras": "^1.4.0",
+    "yaml": "^2.6.0"
   }
 }

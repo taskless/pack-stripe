@@ -1,3 +1,4 @@
 declare module 'main' {
-    export function greet(): I32;
+  export function pre(): I32;
+  export function post(): I32;
 }
