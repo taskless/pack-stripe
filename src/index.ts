@@ -1,45 +1,25 @@
-type RPCInput<
-  TContext = unknown,
-  TRequestBody = unknown,
-  TResponseBody = unknown
-> = {
-  request: {
-    domain: string;
-    path: string;
-    url: string;
-    method: string;
-    headers: [string, string][];
-    body?: TRequestBody;
-  };
-  response?: {
-    status: number;
-    headers?: [string, string][];
-    body?: TResponseBody;
-  };
-  context: TContext;
-};
+import type { PluginInput as TPI, PluginOutput } from "@taskless/loader/core";
 
-type RPCOutput<TContext = unknown> = {
-  capture?: Record<string, string | number>;
-  context?: TContext;
-};
-
-type Context = {};
-
-type PreInput = RPCInput<Context, unknown, unknown>;
-
-type PreOutput = RPCOutput<Context>;
-
-type PostInput = RPCInput<Context, unknown, {
+type StripeResponse = {
   error?: {
-    type: "api_error" | "card_error" | "idempotency_error" | "invalid_request_error",
-    code?: string | null
-    message?: string | null
-    doc_url?: string | null
-    request_log_url?: string | null
-  }
-}>;
-type PostOutput = RPCOutput;
+    type:
+      | "api_error"
+      | "card_error"
+      | "idempotency_error"
+      | "invalid_request_error";
+    // eslint-disable-next-line @typescript-eslint/ban-types
+    code?: string | null;
+    // eslint-disable-next-line @typescript-eslint/ban-types
+    message?: string | null;
+    // eslint-disable-next-line @typescript-eslint/ban-types
+    doc_url?: string | null;
+    // eslint-disable-next-line @typescript-eslint/ban-types
+    request_log_url?: string | null;
+  };
+};
+
+type PreInput = TPI;
+type PostInput = TPI<unknown, unknown, StripeResponse>;
 
 /**
  * pre hook function
@@ -89,21 +69,21 @@ export function post() {
     return;
   }
 
-  if (!input.response.body || !input.response.body.error) {
+  if (!input.response.body?.error) {
     Host.outputString(JSON.stringify({}));
     return;
   }
 
-  const errorData: Record<string, string|number> = {};
+  const errorData: Record<string, string | number> = {};
   for (const [name, value] of Object.entries(input.response.body.error)) {
     if (value) {
       errorData[name] = value;
     }
   }
 
-  const output: PostOutput = {
+  const output: PluginOutput = {
     capture: {
-      ...errorData
+      ...errorData,
     },
   };
 
