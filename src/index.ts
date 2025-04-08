@@ -1,5 +1,25 @@
-import type { PluginInput as TPI, PluginOutput } from "@taskless/loader/core";
+import {
+  type PluginInput as PI,
+  type PluginOutput as PO,
+} from "@taskless/loader";
+import { z } from "zod";
+import { type Pack } from "./__generated__/pack.js";
+import { isValidHost, readInput, writeOutput } from "./helpers.js";
+import { manifest } from "./manifest.js";
 
+type PluginInput<
+  TContext = unknown,
+  TRequest = unknown,
+  TResponse = unknown,
+> = PI<TContext, TRequest, TResponse> & Pick<Pack, "configuration">;
+
+type PluginOutput<TContext = unknown> = PO<TContext> &
+  Pick<Pack, "configuration">;
+
+/**
+ * The stripe response is the OpenAPI response, not the object
+ * exposed via SDKs
+ */
 type StripeResponse = {
   error?: {
     type:
@@ -18,30 +38,36 @@ type StripeResponse = {
   };
 };
 
-type PreInput = TPI;
-type PostInput = TPI<unknown, unknown, StripeResponse>;
+const configuration = z
+  .object({
+    domains: z.array(z.string()).default(["api.stripe.com"]),
+    enableSuccess: z.boolean().default(false),
+  })
+  .default({
+    domains: ["api.stripe.com"],
+    enableSuccess: false,
+  });
 
-/**
- * pre hook function
- * permissions:
- *  request: headers
- * capture:
- *  idempotencyKey
- */
 export function pre() {
-  const input = JSON.parse(Host.inputString()) as PreInput;
+  const input = readInput<PluginInput>();
+  const userConfig = configuration.parse(input.configuration);
 
-  // TODO: This is throwing "not a function"
-  // const idempotencyKey = (input.request.headers ?? []).find(([key]) => key.toLowerCase() === "idempotency-key")?.[1];
+  // if there's no domains, then this is a v1 loader calling us
+  // so we skip the domain check
+  if (!isValidHost(input.request.domain, userConfig.domains)) {
+    writeOutput<PluginOutput>({});
+    return;
+  }
 
-  // const output:PreOutput = {
-  //   capture: {
-  //     ...(idempotencyKey ? { idempotencyKey } : {}),
-  //   }
-  // }
+  const idempotencyKey = (input.request.headers ?? []).find(
+    ([key]) => key.toLowerCase() === "idempotency-key"
+  )?.[1];
 
-  // Host.outputString(JSON.stringify(output));
-  Host.outputString(JSON.stringify({}));
+  writeOutput<PluginOutput>({
+    capture: {
+      ...(idempotencyKey ? { idempotencyKey } : {}),
+    },
+  });
 }
 
 /**
@@ -56,36 +82,54 @@ export function pre() {
  *  request_log_url: string - link to the stripe request log
  */
 export function post() {
-  const input = JSON.parse(Host.inputString()) as PostInput;
+  const input = readInput<PluginInput<unknown, unknown, StripeResponse>>();
+  const userConfig = configuration.parse(input.configuration);
+
+  // if there's no domains, then this is a v1 loader calling us
+  // so we skip the domain check
+  if (!isValidHost(input.request.domain, userConfig.domains)) {
+    writeOutput<PluginOutput>({});
+    return;
+  }
 
   if (!input.response) {
     Host.outputString(JSON.stringify({}));
     return;
   }
 
-  // TODO: make this a correct type based on TResponseBody being set
-  if (input.response.status < 400) {
-    Host.outputString(JSON.stringify({}));
+  const capture: {
+    status?: number;
+    errorType?: string;
+    errorCode?: string;
+    errorMessage?: string;
+    errorDocUrl?: string;
+    errorRequestLogUrl?: string;
+  } = {};
+
+  if (input.response.status >= 400 || userConfig.enableSuccess) {
+    capture.status = input.response.status;
     return;
   }
 
-  if (!input.response.body?.error) {
-    Host.outputString(JSON.stringify({}));
-    return;
+  if (input.response.body?.error) {
+    capture.errorCode = input.response.body.error.code ?? undefined;
+    capture.errorMessage = input.response.body.error.message ?? undefined;
+    capture.errorDocUrl = input.response.body.error.doc_url ?? undefined;
+    capture.errorRequestLogUrl =
+      input.response.body.error.request_log_url ?? undefined;
+    capture.errorType = input.response.body.error.type ?? undefined;
   }
 
-  const errorData: Record<string, string | number> = {};
-  for (const [name, value] of Object.entries(input.response.body.error)) {
-    if (value) {
-      errorData[name] = value;
-    }
-  }
+  // this removes all undefined from the capture object
+  // eslint-disable-next-line unicorn/prefer-structured-clone
+  const finalizedCapture = JSON.parse(JSON.stringify(capture)) as Record<
+    string,
+    unknown
+  >;
 
-  const output: PluginOutput = {
+  writeOutput({
     capture: {
-      ...errorData,
+      ...finalizedCapture,
     },
-  };
-
-  Host.outputString(JSON.stringify(output));
+  });
 }

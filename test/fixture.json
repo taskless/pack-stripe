@@ -2,7 +2,10 @@
   "request": {
     "url": "https://api.stripe.com/v1/payouts/po_1OaFDbEcg9tTZuTgNYmX0PKB",
     "method": "POST",
-    "headers": [["Content-Type", "application/json"]],
+    "headers": [
+      ["Content-Type", "application/json"],
+      ["idempotency-key", "abc"]
+    ],
     "body": "{}"
   },
   "response": {
@@ -13,8 +16,8 @@
   },
   "tests": [
     {
-      "name": "response status was 200",
-      "test": "$[*].dimensions[?(@.name == 'status' && @.value == 200)]"
+      "name": "Idempotency key was captured",
+      "test": "$[*].dimensions[?(@.name == '@taskless/stripe/idempotencyKey' && @.value == 'abc')]"
     }
   ]
 }
