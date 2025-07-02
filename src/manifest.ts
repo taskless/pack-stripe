@@ -1,10 +1,11 @@
+import pk from "../package.json" with { type: "json" };
 import { type Manifest } from "./__generated__/manifest.js";
 
 export const manifest = {
-  name: "@taskless/stripe",
+  name: "stripe",
   description:
     "Capture details about stripe requests and responses, including error details, workbench URLs, and more.",
-  version: "1.0.1",
+  version: pk.version,
   schema: "pre2",
   permissions: {
     // no extended permissions required

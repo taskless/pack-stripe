@@ -17,7 +17,7 @@
   "tests": [
     {
       "name": "Idempotency key was captured",
-      "test": "$[*].dimensions[?(@.name == '@taskless/stripe/idempotencyKey' && @.value == 'abc')]"
+      "test": "$[*].dimensions[?(@.name == 'stripe/idempotencyKey' && @.value == 'abc')]"
     }
   ]
 }
